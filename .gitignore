@@ -1,0 +1,5 @@
+dask-worker-space/
+.ipynb_checkpoints/
+numba_test/
+__pycache__/
+*.pyc
