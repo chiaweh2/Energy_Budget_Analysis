@@ -1,10 +1,7 @@
-
+import time
 import numpy as np
-from datetime import date
-from netCDF4 import Dataset
 import xarray as xr
 
-import time
 
 
 def cal_ml_rhodzVI(da_var,da_sp):
@@ -44,38 +41,38 @@ def cal_ml_rhodzVI(da_var,da_sp):
     #Get a list of level numbers in reverse order
     da_reversedlevel=da_level.isel(level=slice(None, None, -1)).astype(int)
     #Integrate up into the atmosphere from lowest level
-    T_ini=time.time()
+    # T_ini=time.time()
     g=9.81
     # calculate first da_Ph_levplusone (surface, lev = 60)
     da_Ph_levplusone = A[levelSize] + (B[levelSize]*da_sp)  ## the level at sfc (because it is the first "level plus one" corresponding to first model level <level = 60>)
     da_var_VI=np.zeros(np.shape(da_sp))
     for lev in da_reversedlevel.values:  ###### HH: 60 (sfc), 59... -> 1 (top)  ## loop through "model levels"!
-        print(lev)
+        # print(lev)
         da_var_level=da_var.sel(level=lev)
         #compute the pressures (on half-levels) Ph:Phalf
         da_Ph_lev = A[lev-1] + (B[lev-1] * da_sp)
         dP = da_Ph_levplusone-da_Ph_lev
         da_var_VI = da_var_VI + (da_var_level*dP/g)
         da_Ph_levplusone = da_Ph_lev
-    dT=(time.time()-T_ini)
-    print(str(dT/60)+'min')
+    # dT=(time.time()-T_ini)
+    # print(str(dT/60)+'min')
     return da_var_VI
 
 
 ##### main script ####
 t0 = time.time()
-ds = xr.open_dataset('/Projects/erai_modellevel/q_ml_1980_rechunked.nc').load()
-da_lp = xr.open_dataset('/Projects/erai_flux/modellevel/zlnsp_ml_1980.nc').lnsp.load()
+ds = xr.open_dataset('/Projects/erai_modellevel/q_ml_1980_rechunked.nc').isel(time=0,longitude=slice(0,50),latitude=slice(0,50)).load()
+da_lp = xr.open_dataset('/Projects/erai_flux/modellevel/zlnsp_ml_1980.nc').isel(time=0,longitude=slice(0,50),latitude=slice(0,50)).lnsp.load()
 t1 = time.time()
-total = (t1-t0)/60. 
-print("read data",total,"mins")
+total = (t1-t0) 
+print("read data",total,"secs")
 
 t0 = time.time()
 da_ps = np.exp(da_lp)
 da_q_vi=cal_ml_rhodzVI(ds.q,da_ps)
 t1 = time.time()
-total = (t1-t0)/60. 
-print("vertical integration",total,"mins")
+total = (t1-t0)
+print("vertical integration",total,"secs")
 
 
-da_q_vi.to_netcdf('/Projects/erai_modellevel/q_vint_1980_hh.nc')
+# da_q_vi.to_netcdf('/Projects/erai_modellevel/q_vint_1980_hh.nc')
