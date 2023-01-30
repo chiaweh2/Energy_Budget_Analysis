@@ -1,61 +1,6 @@
 import numpy as np
 import xarray as xr
 import time
-def encode_nc(
-        ds,var_list,
-        t_chunksize=None,z_chunksize=None,y_chunksize=None,x_chunksize=None,
-        t_dim=None,z_dim=None,y_dim=None,x_dim=None,
-        missing_value=-1.e20,_FillValue=-1.e20
-    ):
-    chunksize = []
-    if t_chunksize:
-        chunksize.append(t_chunksize)
-    if z_chunksize:
-        chunksize.append(z_chunksize)
-    if y_chunksize:
-        chunksize.append(y_chunksize)
-    if x_chunksize:
-        chunksize.append(x_chunksize)
-    encoding_list = {}
-    # variable encoding
-    for varname in var_list:
-        da_data = ds[varname]
-        encoding_list[varname] = {}
-        encoding_list[varname]['chunksizes'] = chunksize
-        encoding_list[varname]['contiguous'] = False
-        encoding_list[varname]['zlib'] = True
-        encoding_list[varname]['complevel'] = 2
-        encoding_list[varname]['shuffle'] = True
-        encoding_list[varname]['missing_value'] = missing_value
-        encoding_list[varname]['_FillValue'] = _FillValue
-        encoding_list[varname]['dtype'] = 'float32'
-    # time dim encoding
-    if t_dim :
-        encoding_list[t_dim] = {}
-        encoding_list[t_dim]['contiguous'] = True
-        encoding_list[t_dim]['dtype'] = 'float64'
-        encoding_list[t_dim]['_FillValue'] = None
-        encoding_list[t_dim]['units'] = 'hours since 1970-01-01 00:00:00' # unified the file time unit
-    # lon dim encoding
-    if x_dim :
-        encoding_list[x_dim] = {}
-        encoding_list[x_dim]['contiguous'] = True
-        encoding_list[x_dim]['_FillValue'] = None
-        encoding_list[x_dim]['dtype'] = 'float64'
-    # lat dim encoding
-    if y_dim :
-        encoding_list[y_dim] = {}
-        encoding_list[y_dim]['contiguous'] = True
-        encoding_list[y_dim]['_FillValue'] = None
-        encoding_list[y_dim]['dtype'] = 'float64'
-    # level dim encoding
-    if z_dim :
-        encoding_list[z_dim] = {}
-        encoding_list[z_dim]['contiguous'] = True
-        encoding_list[z_dim]['_FillValue'] = None
-        encoding_list[z_dim]['dtype'] = 'int32'
-    return encoding_list
-
 
 def get_A_B_erai(levelSize=60):
     """
@@ -128,10 +73,10 @@ def mlevel_vint(var,ps,model='erai'):
     # gravitional constant
     g=9.81
     # calculate dp matrix for vertical integration
-    dp = cal_dp(ps,model='erai')
-    dp = np.moveaxis(dp, -1, 1)
+    dp = cal_dp(ps,model=model)
+    dp = np.moveaxis(dp, -1, 0)
     # vertical integration from 0 to ps int(var/g*dp)
-    var_vint = np.sum(var*dp,axis=-1)/g
+    var_vint = np.sum(var*dp,axis=0)/g
     return var_vint
 
 
@@ -139,34 +84,27 @@ if __name__ == '__main__':
 
     # read data
     t0 = time.time()
-    ds = xr.open_dataset('/Projects/erai_modellevel/q_ml_1980_rechunked.nc').load()
-    da_lp = xr.open_dataset('/Projects/erai_flux/modellevel/zlnsp_ml_1980.nc').lnsp.load()
+    ds = xr.open_dataset('/Projects/erai_modellevel/q_ml_1980_rechunked.nc').isel(time=0,longitude=slice(0,50),latitude=slice(0,50)).load()
+    da_lp = xr.open_dataset('/Projects/erai_flux/modellevel/zlnsp_ml_1980.nc').lnsp.isel(time=0,longitude=slice(0,50),latitude=slice(0,50)).load()
     t1 = time.time()
-    total = (t1-t0)/60. 
-    print("read data",total,"mins")
+    total = (t1-t0)
+    print("read data",total,"secs")
 
     # calculate vertical integration
     t0 = time.time()
     q_vi = mlevel_vint(ds.q.values,np.exp(da_lp).values,model='erai')
     t1 = time.time()
-    total = (t1-t0)/60. 
-    print("vertical integration",total,"mins")
+    total = (t1-t0) 
+    print("vertical integration",total,"secs")
 
-    da_q_vint = ds.q.isel(level=0,drop=True)
-    da_q_vint = q_vi
+    da_q_vint = ds.q.isel(level=0,drop=True).copy(data=q_vi)
+    # da_q_vint = q_vi
     ds_q_vint = xr.Dataset()
     ds_q_vint.attrs['comments'] = 'variable vertical integrated along model level'
     ds_q_vint['q_vint'] = da_q_vint
     ds_q_vint['q_vint'].attrs['long_name'] = 'vertical integrated q along model level'
 
-    encoding_list = encode_nc(
-                                ds_q_vint,['q_vint'],
-                                t_chunksize=1460,z_chunksize=None,y_chunksize=10,x_chunksize=10,
-                                t_dim=time,z_dim=None,y_dim="latitude",x_dim="longitude",
-                                missing_value=-1.e20,_FillValue=-1.e20
-                            )
-
-    ds_q_vint.to_netcdf('/Projects/erai_modellevel/q_vint_1980.nc',encoding=encoding_list)
+    # ds_q_vint.to_netcdf('/Projects/erai_modellevel/q_vint_1980.nc',encoding=encoding_list)
  
 
 
