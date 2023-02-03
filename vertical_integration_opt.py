@@ -4,8 +4,11 @@ import time
 
 def get_A_B_erai(levelSize=60):
     """
-    This function return A and B array used to calculate the half level (interface of model levels) pressure
+    This function return A and B array used to calculate the half level
+    (interface of model levels) pressure.
+
     source: ECMWF ERA-Interim GRIB file (the pv array in the function)
+    
     return A, B
     """
     pv =  [
