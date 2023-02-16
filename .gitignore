@@ -3,3 +3,4 @@ dask-worker-space/
 numba_test/
 __pycache__/
 *.pyc
+data/
