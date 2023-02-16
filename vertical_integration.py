@@ -61,8 +61,8 @@ def cal_ml_rhodzVI(da_var,da_sp):
 
 ##### main script ####
 t0 = time.time()
-ds = xr.open_dataset('./data/q_ml_1980.nc').isel(time=0).load()
-da_lp = xr.open_dataset('./data/zlnsp_ml_1980.nc').lnsp.isel(time=0).load()
+ds = xr.open_dataset('./data/q_ml_1980.nc').isel(time=slice(0,100)).load()
+da_lp = xr.open_dataset('./data/zlnsp_ml_1980.nc').lnsp.isel(time=slice(0,100)).load()
 t1 = time.time()
 total = (t1-t0) 
 print("read data",total,"secs")
