@@ -157,14 +157,11 @@ if __name__ == '__main__':
     total = (t1-t0) 
     print("vertical integration",total,"secs")
 
-    da_q_vint = ds.q.isel(level=0,drop=True).copy(data=q_vi)
-    # da_q_vint = q_vi
-    ds_q_vint = xr.Dataset()
-    ds_q_vint.attrs['comments'] = 'variable vertical integrated along model level'
-    ds_q_vint['q_vint'] = da_q_vint
-    ds_q_vint['q_vint'].attrs['long_name'] = 'vertical integrated q along model level'
+    # da_q_vint = ds.q.isel(level=0,drop=True).copy(data=q_vi)
+    # # da_q_vint = q_vi
+    # ds_q_vint = xr.Dataset()
+    # ds_q_vint.attrs['comments'] = 'variable vertical integrated along model level'
+    # ds_q_vint['q_vint'] = da_q_vint
+    # ds_q_vint['q_vint'].attrs['long_name'] = 'vertical integrated q along model level'
 
-    # ds_q_vint.to_netcdf('/Projects/erai_modellevel/q_vint_1980.nc',encoding=encoding_list)
- 
-
-
+    # ds_q_vint.to_netcdf('../data/q_vint_1980_opt.nc')
