@@ -1,3 +1,4 @@
+#!/home/6embdqs6/.conda/envs/vint/bin/python
 import numpy as np
 import xarray as xr
 import time
@@ -138,7 +139,7 @@ if __name__ == '__main__':
     ds = xr.open_dataset('./data/q_ml_1980.nc').isel(time=slice(0,500)).load()
     da_lp = xr.open_dataset('./data/zlnsp_ml_1980.nc').lnsp.isel(time=slice(0,500)).load()
     t1 = time.time()
-    total = (t1-t0)
+    total = t1-t0
     print("read data",total,"secs")
 
     ##### calculate high frequency
@@ -154,7 +155,7 @@ if __name__ == '__main__':
     t0 = time.time()
     q_vi = mlevel_vint(ds.q.values,np.exp(da_lp).values,model='erai')
     t1 = time.time()
-    total = (t1-t0) 
+    total = t1-t0
     print("vertical integration",total,"secs")
 
     # da_q_vint = ds.q.isel(level=0,drop=True).copy(data=q_vi)
