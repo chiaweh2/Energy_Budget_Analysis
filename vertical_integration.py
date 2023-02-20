@@ -1,3 +1,4 @@
+#!/home/6embdqs6/.conda/envs/vint/bin/python
 import time
 import numpy as np
 import xarray as xr
@@ -64,14 +65,14 @@ t0 = time.time()
 ds = xr.open_dataset('./data/q_ml_1980.nc').isel(time=slice(0,100)).load()
 da_lp = xr.open_dataset('./data/zlnsp_ml_1980.nc').lnsp.isel(time=slice(0,100)).load()
 t1 = time.time()
-total = (t1-t0) 
+total = t1-t0
 print("read data",total,"secs")
 
 t0 = time.time()
 da_ps = np.exp(da_lp)
 da_q_vi=cal_ml_rhodzVI(ds.q,da_ps)
 t1 = time.time()
-total = (t1-t0)
+total = t1-t0
 print("vertical integration",total,"secs")
 
 
