@@ -41,6 +41,8 @@ def get_A_B_erai(levelSize=60):
     ## extract A and B 
     A = np.array(pv[:levelSize+1])
     B = np.array(pv[levelSize+1:])
+
+
     return A, B
 
 def cal_dp(ps,model='erai'):
@@ -88,8 +90,8 @@ if __name__ == '__main__':
 
     # read data
     t0 = time.time()
-    ds = xr.open_dataset('./data/q_ml_1980.nc').load()
-    da_lp = xr.open_dataset('./data/zlnsp_ml_1980.nc').lnsp.load()
+    ds = xr.open_dataset('./data/q_ml_1980.nc').isel(time=slice(0,500)).load()
+    da_lp = xr.open_dataset('./data/zlnsp_ml_1980.nc').lnsp.isel(time=slice(0,500)).load()
     t1 = time.time()
     total = t1-t0
     print("read data",total,"secs")
