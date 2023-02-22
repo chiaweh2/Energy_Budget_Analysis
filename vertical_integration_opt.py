@@ -41,6 +41,8 @@ def get_A_B_erai(levelSize=60):
     ## extract A and B 
     A = np.array(pv[:levelSize+1])
     B = np.array(pv[levelSize+1:])
+
+
     return A, B
 
 def cal_dp(ps,model='erai'):
