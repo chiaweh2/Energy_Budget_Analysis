@@ -1,3 +1,5 @@
+#!/home/chsu/mambaforge/envs/py3_10/bin/python
+
 import numpy as np
 import xarray as xr
 import time
