@@ -4,3 +4,4 @@ numba_test/
 __pycache__/
 *.pyc
 data/
+*.nsys-rep
