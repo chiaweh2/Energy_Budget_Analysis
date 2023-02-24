@@ -82,16 +82,77 @@ def mlevel_vint(var,ps,model='erai'):
     var_vint = np.sum(var*dp,axis=1)/g
     return var_vint
 
+def lanczos_low_pass_weights(window, cutoff):
+    """
+    Calculate weights for a low pass Lanczos filter.
+    Inputs:
+    ================
+    window: int
+        The length of the filter window (odd number).
+    cutoff: float
+        The cutoff frequency(1/cut off time steps)
+    """
+    order = ((window - 1) // 2 ) + 1
+    nwts = 2 * order + 1
+    w = np.zeros([nwts])
+    n = nwts // 2
+    w[n] = 2 * cutoff
+    k = np.arange(1., n)
+    sigma = np.sin(np.pi * k / n) * n / (np.pi * k)
+#     sigma = 1.   # edit for testing to match with Charlotte ncl code
+    firstfactor = np.sin(2. * np.pi * cutoff * k) / (np.pi * k)
+    w[n-1:0:-1] = firstfactor * sigma
+    w[n+1:-1] = firstfactor * sigma
+    return w[1:-1]
+
+
+def cal_LF_4D(da_var_TOT,wt):
+
+    da_var_ano=da_var_TOT-da_var_TOT.mean(dim='time')
+    da_var_ano_lancflow=da_var_ano.copy()
+
+    print(da_var_ano)
+    nlat=da_var_ano.latitude.size
+    nlon=da_var_ano.longitude.size
+    nlev=da_var_ano.level.size
+    for llev in range(nlev):
+        print('llev'+str(llev))
+        for llon in range(nlon):
+            print(llon)
+            for llat in range(nlat):
+                da_var_ano_lancflow[:,llev,llat,llon] = np.convolve(wt,da_var_ano[:,llev,llat,llon],mode='same')
+                # note: no need to add "values"
+                ## note: change the [:,llev] depending on the dimension of the array
+
+    return da_var_ano, da_var_ano_lancflow
+
 
 if __name__ == '__main__':
 
     # read data
     t0 = time.time()
-    ds = xr.open_dataset('./data/q_ml_1980.nc').isel(time=slice(0,500)).load()
-    da_lp = xr.open_dataset('./data/zlnsp_ml_1980.nc').lnsp.isel(time=slice(0,500)).load()
+    print('read data')
+    ds = xr.open_dataset('./data/q_ml_1980.nc').isel(time=slice(0,500)).isel(longitude=slice(0,2)).isel(latitude=slice(0,2)).load()
+    da_lp = xr.open_dataset('./data/zlnsp_ml_1980.nc').lnsp.isel(time=slice(0,500)).isel(longitude=slice(0,2)).isel(latitude=slice(0,2)).load()
+    # ds = xr.open_dataset('./data/q_ml_1980.nc').isel(time=slice(0,500)).load()
+    # da_lp = xr.open_dataset('./data/zlnsp_ml_1980.nc').lnsp.isel(time=slice(0,500)).load()
     t1 = time.time()
     total = (t1-t0)
     print("read data",total,"secs")
+
+    ##### calculate high frequency <8d q
+
+    ## calculate weight
+    wt=lanczos_low_pass_weights(96,8*4)
+    print(wt)
+
+    ## calculate ano and low pass
+    [da_q_ano,da_q_8dLPass]=cal_LF_4D(ds.q,wt)
+    #calculate high pass
+    da_q_8dHPass=da_q_ano-da_q_8dLPass
+
+
+
 
     # calculate vertical integration
     t0 = time.time()
