@@ -132,11 +132,11 @@ if __name__ == '__main__':
 
     # read data
     t0 = time.time()
-    print('read data')
-    ds = xr.open_dataset('./data/q_ml_1980.nc').isel(time=slice(0,500)).isel(longitude=slice(0,2)).isel(latitude=slice(0,2)).load()
-    da_lp = xr.open_dataset('./data/zlnsp_ml_1980.nc').lnsp.isel(time=slice(0,500)).isel(longitude=slice(0,2)).isel(latitude=slice(0,2)).load()
-    # ds = xr.open_dataset('./data/q_ml_1980.nc').isel(time=slice(0,500)).load()
-    # da_lp = xr.open_dataset('./data/zlnsp_ml_1980.nc').lnsp.isel(time=slice(0,500)).load()
+    # print('read data')
+    # ds = xr.open_dataset('./data/q_ml_1980.nc').isel(time=slice(0,500)).isel(longitude=slice(0,2)).isel(latitude=slice(0,2)).load()
+    # da_lp = xr.open_dataset('./data/zlnsp_ml_1980.nc').lnsp.isel(time=slice(0,500)).isel(longitude=slice(0,2)).isel(latitude=slice(0,2)).load()
+    ds = xr.open_dataset('./data/q_ml_1980.nc').isel(time=slice(0,500)).load()
+    da_lp = xr.open_dataset('./data/zlnsp_ml_1980.nc').lnsp.isel(time=slice(0,500)).load()
     t1 = time.time()
     total = (t1-t0)
     print("read data",total,"secs")
