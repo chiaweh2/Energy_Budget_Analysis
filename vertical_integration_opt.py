@@ -106,26 +106,27 @@ def lanczos_low_pass_weights(window, cutoff):
     return w[1:-1]
 
 
-def cal_LF_4D(da_var_TOT,wt):
+def lanczos_filter_4d(da_var_anom, window, cutoff):
 
-    da_var_ano=da_var_TOT-da_var_TOT.mean(dim='time')
-    da_var_ano_lancflow=da_var_ano.copy()
+    wt = lanczos_low_pass_weights(window, cutoff)
+    da_var_anom_filtered = da_var_anom.copy()
 
-    print(da_var_ano)
-    nlat=da_var_ano.latitude.size
-    nlon=da_var_ano.longitude.size
-    nlev=da_var_ano.level.size
+    nlat=da_var_anom_filtered.latitude.size
+    nlon=da_var_anom_filtered.longitude.size
+    nlev=da_var_anom_filtered.level.size
+
     for llev in range(nlev):
-        print('llev'+str(llev))
         for llon in range(nlon):
-            print(llon)
             for llat in range(nlat):
-                da_var_ano_lancflow[:,llev,llat,llon] = np.convolve(wt,da_var_ano[:,llev,llat,llon],mode='same')
+                da_var_anom_filtered[:,llev,llat,llon] = np.convolve(
+                    wt,
+                    da_var_anom[:,llev,llat,llon],
+                    mode='same'
+                    )
                 # note: no need to add "values"
                 ## note: change the [:,llev] depending on the dimension of the array
 
-    return da_var_ano, da_var_ano_lancflow
-
+    return da_var_anom_filtered
 
 if __name__ == '__main__':
 
@@ -140,19 +141,14 @@ if __name__ == '__main__':
     total = (t1-t0)
     print("read data",total,"secs")
 
-    ##### calculate high frequency <8d q
-
-    ## calculate weight
-    wt=lanczos_low_pass_weights(96,8*4)
-    print(wt)
-
-    ## calculate ano and low pass
-    [da_q_ano,da_q_8dLPass]=cal_LF_4D(ds.q,wt)
+    ##### calculate high frequency
+    # calculate ano and low pass
+    window = 96
+    cutoff = 8*4   # 6hourly daily data (4 times daily) for 8 days
+    da_anom = ds.q - ds.q.mean(dim='time')
+    da_anom_lowpass = lanczos_filter_4d(ds.q,window,cutoff)
     #calculate high pass
-    da_q_8dHPass=da_q_ano-da_q_8dLPass
-
-
-
+    da_anom_highpass = da_anom-da_anom_lowpass
 
     # calculate vertical integration
     t0 = time.time()
