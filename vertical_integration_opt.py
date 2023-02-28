@@ -2,6 +2,7 @@
 import numpy as np
 import xarray as xr
 import time
+from scipy.ndimage import convolve1d
 
 def get_A_B_erai(levelSize=60):
     """
@@ -133,11 +134,17 @@ def lanczos_filter_4d(da_var_anom, window, cutoff):
     for llev in range(nlev):
         for llon in range(nlon):
             for llat in range(nlat):
-                da_var_anom_filtered[:,llev,llat,llon] = np.convolve(
+                # da_var_anom_filtered[:,llev,llat,llon] = np.convolve(
+                #     wt,
+                #     da_var_anom[:,llev,llat,llon].data,
+                #     mode='same'
+                #     )
+                da_var_anom_filtered[:,llev,llat,llon] = convolve1d(
+                    da_var_anom[:,llev,llat,llon].astype('float64').data,
                     wt,
-                    da_var_anom[:,llev,llat,llon].data,
-                    mode='same'
-                    )
+                    output = 'float64',
+                    mode='reflect'
+                    )                
                 # note: no need to add "values"
                 ## note: change the [:,llev] depending on the dimension of the array
 
