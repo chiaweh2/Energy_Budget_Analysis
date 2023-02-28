@@ -136,35 +136,35 @@ if __name__ == '__main__':
     # read data
     t0 = time.time()
     # print('read data')
-    # ds = xr.open_dataset('./data/q_ml_1980.nc').isel(time=slice(0,500)).isel(longitude=slice(0,2)).isel(latitude=slice(0,2)).load()
-    # da_lp = xr.open_dataset('./data/zlnsp_ml_1980.nc').lnsp.isel(time=slice(0,500)).isel(longitude=slice(0,2)).isel(latitude=slice(0,2)).load()
-    ds = xr.open_dataset('./data/q_ml_1980.nc').isel(time=slice(0,500)).load()
-    da_lp = xr.open_dataset('./data/zlnsp_ml_1980.nc').lnsp.isel(time=slice(0,500)).load()
+    ds = xr.open_dataset('./data/q_ml_1980.nc').isel(longitude=slice(0,4)).isel(latitude=slice(0,4)).load()
+    da_lp = xr.open_dataset('./data/zlnsp_ml_1980.nc').lnsp.isel(longitude=slice(0,4)).isel(latitude=slice(0,4)).load()
+    # ds = xr.open_dataset('./data/q_ml_1980.nc').isel(time=slice(0,500)).load()
+    # da_lp = xr.open_dataset('./data/zlnsp_ml_1980.nc').lnsp.isel(time=slice(0,500)).load()
     t1 = time.time()
     total = t1-t0
     print("read data",total,"secs")
 
     ##### calculate high frequency
+    t0 = time.time()
     # calculate ano and low pass
     window = 96
     cutoff = 8*4   # 6hourly daily data (4 times daily) for 8 days
     da_anom = ds.q - ds.q.mean(dim='time')
-    da_anom_lowpass = lanczos_filter_4d(ds.q,window,cutoff)
+    da_anom_lowpass = lanczos_filter_4d(da_anom,window,cutoff)
     #calculate high pass
     da_anom_highpass = da_anom-da_anom_lowpass
 
     # calculate vertical integration
-    t0 = time.time()
     q_vi = mlevel_vint(ds.q.values,np.exp(da_lp).values,model='erai')
     t1 = time.time()
     total = t1-t0
     print("vertical integration",total,"secs")
 
-    # da_q_vint = ds.q.isel(level=0,drop=True).copy(data=q_vi)
-    # # da_q_vint = q_vi
-    # ds_q_vint = xr.Dataset()
-    # ds_q_vint.attrs['comments'] = 'variable vertical integrated along model level'
-    # ds_q_vint['q_vint'] = da_q_vint
-    # ds_q_vint['q_vint'].attrs['long_name'] = 'vertical integrated q along model level'
+    da_q_vint = ds.q.isel(level=0,drop=True).copy(data=q_vi)
+    # da_q_vint = q_vi
+    ds_q_vint = xr.Dataset()
+    ds_q_vint.attrs['comments'] = 'variable vertical integrated along model level'
+    ds_q_vint['q_vint'] = da_q_vint
+    ds_q_vint['q_vint'].attrs['long_name'] = 'vertical integrated q along model level'
 
-    # ds_q_vint.to_netcdf('../data/q_vint_1980_opt.nc')
+    ds_q_vint.to_netcdf('../data/q_vint_1980_opt_tfilter.nc')
