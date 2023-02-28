@@ -1,9 +1,9 @@
 #!/home/6embdqs6/.conda/envs/vint/bin/python
-import numpy as np
-import xarray as xr
 import time
 import cupy_xarray
 import cupy as cp
+import numpy as np
+import xarray as xr
 
 
 def get_A_B_erai(levelSize=60):
@@ -88,16 +88,15 @@ def mlevel_vint(da_var,da_log_ps,model='erai'):
     dp = cal_dp(ps_gpu,model=model)
     dp = cp.moveaxis(dp, -1, 1)
 
-    dp_cpu = cp.asnumpy(dp)
-    da_dp = da_var.copy(data=dp_cpu)
-    # da_q_vint = q_vi
-    ds_dp = xr.Dataset()
-    ds_dp.attrs['comments'] = 'variable vertical integrated along model level'
-    ds_dp['dp'] = da_dp
-    ds_dp['dp'].attrs['long_name'] = 'vertical integrated q along model level'
-    ds_dp.to_netcdf('/home/tropical2extratropic/data/dp_gpu.nc')
+    # dp_cpu = cp.asnumpy(dp)
+    # da_dp = da_var.copy(data=dp_cpu)
+    # # da_q_vint = q_vi
+    # ds_dp = xr.Dataset()
+    # ds_dp.attrs['comments'] = 'variable vertical integrated along model level'
+    # ds_dp['dp'] = da_dp
+    # ds_dp['dp'].attrs['long_name'] = 'vertical integrated q along model level'
+    # ds_dp.to_netcdf('/home/tropical2extratropic/data/dp_gpu.nc')
 
-    
     # vertical integration from 0 to ps int(var/g*dp)
     var_vint = cp.sum(var_gpu*dp,axis=1, dtype='float64')/g
     return var_vint
@@ -174,26 +173,26 @@ if __name__ == '__main__':
     cutoff = 1/(8*4)   # 6hourly data (4 times daily) for 8 days
     da_anom_gpu = da_q_gpu - da_q_gpu.mean(dim='time')
     
-    da_anom_cpu = da_anom_gpu.as_numpy()
-    da_q_anom = ds.q.copy(data=da_anom_cpu.data)
-    ds_q_anom = xr.Dataset()
-    ds_q_anom.attrs['comments'] = 'variable time filtered along time dim'
-    ds_q_anom['q_anom'] = da_q_anom
-    ds_q_anom['q_anom'].attrs['long_name'] = 'variable time filtered along time dim'
-    ds_q_anom.to_netcdf('/home/tropical2extratropic/data/q_1980_opt_anom_gpu.nc')
+    # da_anom_cpu = da_anom_gpu.as_numpy()
+    # da_q_anom = ds.q.copy(data=da_anom_cpu.data)
+    # ds_q_anom = xr.Dataset()
+    # ds_q_anom.attrs['comments'] = 'variable time filtered along time dim'
+    # ds_q_anom['q_anom'] = da_q_anom
+    # ds_q_anom['q_anom'].attrs['long_name'] = 'variable time filtered along time dim'
+    # ds_q_anom.to_netcdf('/home/tropical2extratropic/data/q_1980_opt_anom_gpu.nc')
 
     da_anom_lowpass = lanczos_filter_4d(da_anom_gpu,window,cutoff)
     #calculate high pass
     da_anom_gpu = da_anom_gpu-da_anom_lowpass
-    da_anom_cpu = da_anom_gpu.as_numpy()
+    # da_anom_cpu = da_anom_gpu.as_numpy()
 
-    da_q_filter = ds.q.copy(data=da_anom_cpu.data)
-    ds_q_filter = xr.Dataset()
-    ds_q_filter.attrs['comments'] = 'variable time filtered along time dim'
-    ds_q_filter['q_filter'] = da_q_filter
-    ds_q_filter['q_filter'].attrs['long_name'] = 'variable time filtered along time dim'
+    # da_q_filter = ds.q.copy(data=da_anom_cpu.data)
+    # ds_q_filter = xr.Dataset()
+    # ds_q_filter.attrs['comments'] = 'variable time filtered along time dim'
+    # ds_q_filter['q_filter'] = da_q_filter
+    # ds_q_filter['q_filter'].attrs['long_name'] = 'variable time filtered along time dim'
 
-    ds_q_filter.to_netcdf('/home/tropical2extratropic/data/q_1980_opt_tfilter_gpu.nc')   
+    # ds_q_filter.to_netcdf('/home/tropical2extratropic/data/q_1980_opt_tfilter_gpu.nc')   
 
     # calculate vertical integration
     q_vi = mlevel_vint(da_anom_gpu,da_lp_gpu,model='erai')
