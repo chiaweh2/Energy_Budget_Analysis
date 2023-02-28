@@ -13,7 +13,7 @@ diff = (np.abs(cpu_result.q_anom-gpu_result.q_anom)).mean().values
 print(diff)
 print(diff/(np.abs(cpu_result.q_anom)).mean().values)
 
-gpu_result = xr.open_dataset(data_dir+'q_1980_opt_tfilter_gpu.nc')
+gpu_result = xr.open_dataset(data_dir+'q_1980_opt_tfilter_gpuMatrix.nc')
 cpu_result = xr.open_dataset(data_dir+'q_1980_opt_tfilter.nc')
 
 print('==================')
@@ -30,7 +30,7 @@ print('==================')
 diff = (np.abs(cpu_result.dp-gpu_result.dp)).mean().values
 print(diff)
 
-gpu_result = xr.open_dataset(data_dir+'q_vint_1980_opt_tfilter_gpu.nc')
+gpu_result = xr.open_dataset(data_dir+'q_vint_1980_opt_tfilter_gpuMatrix.nc')
 cpu_result = xr.open_dataset(data_dir+'q_vint_1980_opt_tfilter.nc')
 
 print('==================')
