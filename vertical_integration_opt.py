@@ -125,28 +125,36 @@ def lanczos_low_pass_weights(window, cutoff):
 def lanczos_filter_4d(da_var_anom, window, cutoff):
 
     wt = lanczos_low_pass_weights(window, cutoff)
-    da_var_anom_filtered = da_var_anom.copy()
 
-    nlat=da_var_anom_filtered.latitude.size
-    nlon=da_var_anom_filtered.longitude.size
-    nlev=da_var_anom_filtered.level.size
+    var_anom_filtered = convolve1d(
+            da_var_anom.astype('float64').data,
+            wt,
+            axis=0,
+            output='float64')
 
-    for llev in range(nlev):
-        for llon in range(nlon):
-            for llat in range(nlat):
-                # da_var_anom_filtered[:,llev,llat,llon] = np.convolve(
-                #     wt,
-                #     da_var_anom[:,llev,llat,llon].data,
-                #     mode='same'
-                #     )
-                da_var_anom_filtered[:,llev,llat,llon] = convolve1d(
-                    da_var_anom[:,llev,llat,llon].astype('float64').data,
-                    wt,
-                    output = 'float64',
-                    mode='reflect'
-                    )                
-                # note: no need to add "values"
-                ## note: change the [:,llev] depending on the dimension of the array
+    da_var_anom_filtered = da_var_anom.copy(data=var_anom_filtered)
+    # da_var_anom_filtered = da_var_anom.copy()
+
+    # nlat=da_var_anom_filtered.latitude.size
+    # nlon=da_var_anom_filtered.longitude.size
+    # nlev=da_var_anom_filtered.level.size
+
+    # for llev in range(nlev):
+    #     for llon in range(nlon):
+    #         for llat in range(nlat):
+    #             # da_var_anom_filtered[:,llev,llat,llon] = np.convolve(
+    #             #     wt,
+    #             #     da_var_anom[:,llev,llat,llon].data,
+    #             #     mode='same'
+    #             #     )
+    #             da_var_anom_filtered[:,llev,llat,llon] = convolve1d(
+    #                 da_var_anom[:,llev,llat,llon].astype('float64').data,
+    #                 wt,
+    #                 output = 'float64',
+    #                 mode='reflect'
+    #                 )                
+    #             # note: no need to add "values"
+    #             ## note: change the [:,llev] depending on the dimension of the array
 
     return da_var_anom_filtered
 
@@ -155,8 +163,8 @@ if __name__ == '__main__':
     # read data
     t0 = time.time()
     # print('read data')
-    ds = xr.open_dataset('./data/q_ml_1980.nc').isel(longitude=slice(0,4)).isel(latitude=slice(0,4)).load()
-    da_lp = xr.open_dataset('./data/zlnsp_ml_1980.nc').lnsp.isel(longitude=slice(0,4)).isel(latitude=slice(0,4)).load()
+    ds = xr.open_dataset('./data/q_ml_1980_rechunked.nc').isel(latitude=slice(0,40)).load()
+    da_lp = xr.open_dataset('./data/zlnsp_ml_1980.nc').lnsp.isel(latitude=slice(0,40)).load()
     da_lp = da_lp.astype('float64')
     # ds = xr.open_dataset('./data/q_ml_1980.nc').isel(time=slice(0,500)).load()
     # da_lp = xr.open_dataset('./data/zlnsp_ml_1980.nc').lnsp.isel(time=slice(0,500)).load()
@@ -170,23 +178,23 @@ if __name__ == '__main__':
     window = 96+96+1
     cutoff = 1/(8*4)   # 6hourly daily data (4 times daily) for 8 days
     da_anom = ds.q - ds.q.mean(dim='time')
-    da_q_anom = ds.q.copy(data=da_anom.data)
-    ds_q_anom = xr.Dataset()
-    ds_q_anom.attrs['comments'] = 'variable time filtered along time dim'
-    ds_q_anom['q_anom'] = da_q_anom
-    ds_q_anom['q_anom'].attrs['long_name'] = 'variable time filtered along time dim'
-    ds_q_anom.to_netcdf('/home/tropical2extratropic/data/q_1980_opt_anom.nc')
+    # da_q_anom = ds.q.copy(data=da_anom.data)
+    # ds_q_anom = xr.Dataset()
+    # ds_q_anom.attrs['comments'] = 'variable time filtered along time dim'
+    # ds_q_anom['q_anom'] = da_q_anom
+    # ds_q_anom['q_anom'].attrs['long_name'] = 'variable time filtered along time dim'
+    # ds_q_anom.to_netcdf('/home/tropical2extratropic/data/q_1980_opt_anom.nc')
 
     da_anom_lowpass = lanczos_filter_4d(da_anom,window,cutoff)
     #calculate high pass
     da_anom = da_anom-da_anom_lowpass
-    da_q_filter = ds.q.copy(data=da_anom.data)
-    ds_q_filter = xr.Dataset()
-    ds_q_filter.attrs['comments'] = 'variable time filtered along time dim'
-    ds_q_filter['q_filter'] = da_q_filter
-    ds_q_filter['q_filter'].attrs['long_name'] = 'variable time filtered along time dim'
+    # da_q_filter = ds.q.copy(data=da_anom.data)
+    # ds_q_filter = xr.Dataset()
+    # ds_q_filter.attrs['comments'] = 'variable time filtered along time dim'
+    # ds_q_filter['q_filter'] = da_q_filter
+    # ds_q_filter['q_filter'].attrs['long_name'] = 'variable time filtered along time dim'
 
-    ds_q_filter.to_netcdf('/home/tropical2extratropic/data/q_1980_opt_tfilter.nc')   
+    # ds_q_filter.to_netcdf('/home/tropical2extratropic/data/q_1980_opt_tfilter.nc')   
 
 
     # calculate vertical integration
@@ -195,12 +203,12 @@ if __name__ == '__main__':
     total = t1-t0
     print("vertical integration",total,"secs")
 
-    da_q_vint = ds.q.isel(level=0,drop=True).copy(data=q_vi)
-    # da_q_vint = q_vi
-    ds_q_vint = xr.Dataset()
-    ds_q_vint.attrs['comments'] = 'variable vertical integrated along model level'
-    ds_q_vint['q_vint'] = da_q_vint
-    ds_q_vint['q_vint'].attrs['long_name'] = 'vertical integrated q along model level'
+    # da_q_vint = ds.q.isel(level=0,drop=True).copy(data=q_vi)
+    # # da_q_vint = q_vi
+    # ds_q_vint = xr.Dataset()
+    # ds_q_vint.attrs['comments'] = 'variable vertical integrated along model level'
+    # ds_q_vint['q_vint'] = da_q_vint
+    # ds_q_vint['q_vint'].attrs['long_name'] = 'vertical integrated q along model level'
 
-    ds_q_vint.to_netcdf('/home/tropical2extratropic/data/q_vint_1980_opt_tfilter.nc')
+    # ds_q_vint.to_netcdf('/home/tropical2extratropic/data/q_vint_1980_opt_tfilter.nc')
 
