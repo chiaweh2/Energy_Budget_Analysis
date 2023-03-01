@@ -102,6 +102,8 @@ def mlevel_vint(da_var,da_log_ps,model='erai'):
 
     # vertical integration from 0 to ps int(var/g*dp)
     var_vint = cp.sum(var_gpu*dp,axis=1, dtype='float64')/g
+
+
     return var_vint
 
 @nvtx.annotate()
@@ -152,9 +154,12 @@ if __name__ == '__main__':
 
     # read data
     t0 = time.time()
-    ds = xr.open_dataset('./data/q_ml_1980.nc').isel(latitude=slice(0,10)).load()
-    da_lp = xr.open_dataset('./data/zlnsp_ml_1980.nc').lnsp.isel(latitude=slice(0,10)).load()
+    ds = xr.open_dataset('./data/q_ml_1980_rechunked.nc').isel(latitude=slice(0,40)).load()
+    da_lp = xr.open_dataset('./data/zlnsp_ml_1980.nc').lnsp.isel(latitude=slice(0,40)).load()
     da_lp = da_lp.astype('float64')
+
+    print(f'CPU Mem used: {ds.q.data.nbytes / 1024**2:.2f} MiB')
+    print(f'CPU Mem used: {da_lp.data.nbytes / 1024**2:.2f} MiB')
     t1 = time.time()
     total = t1-t0
     print("read data",total,"secs")
@@ -163,13 +168,17 @@ if __name__ == '__main__':
     t0 = time.time()
     da_q_gpu = ds.q.cupy.as_cupy()
     da_lp_gpu = da_lp.cupy.as_cupy()
+    print(f'GPU Mem used: {da_q_gpu.data.nbytes / 1024**2:.2f} MiB')
+    print(f'GPU Mem used: {da_lp_gpu.data.nbytes / 1024**2:.2f} MiB')
 
     ##### calculate high frequency
     # calculate ano and low pass
     window = 96+96+1
     cutoff = 1/(8*4)   # 6hourly data (4 times daily) for 8 days
     da_anom_gpu = da_q_gpu - da_q_gpu.mean(dim='time')
-    
+    print(f'GPU Mem used: {da_anom_gpu.data.nbytes / 1024**2:.2f} MiB')
+    del da_q_gpu
+
     # da_anom_cpu = da_anom_gpu.as_numpy()
     # da_q_anom = ds.q.copy(data=da_anom_cpu.data)
     # ds_q_anom = xr.Dataset()
@@ -179,15 +188,18 @@ if __name__ == '__main__':
     # ds_q_anom.to_netcdf('/home/tropical2extratropic/data/q_1980_opt_anom_gpu.nc')
 
     da_anom_lowpass = lanczos_filter_matrix(da_anom_gpu,window,cutoff)
+    print(f'GPU Mem used: {da_anom_lowpass.data.nbytes / 1024**2:.2f} MiB')
+
     #calculate high pass
     da_anom_gpu = da_anom_gpu-da_anom_lowpass
+    del da_anom_lowpass
     # da_anom_cpu = da_anom_gpu.as_numpy()
     # da_q_filter = ds.q.copy(data=da_anom_cpu.data)
     # ds_q_filter = xr.Dataset()
     # ds_q_filter.attrs['comments'] = 'variable time filtered along time dim'
     # ds_q_filter['q_filter'] = da_q_filter
     # ds_q_filter['q_filter'].attrs['long_name'] = 'variable time filtered along time dim'
-    # ds_q_filter.to_netcdf('/home/tropical2extratropic/data/q_1980_opt_tfilter_gpuMatrix.nc')   
+    # ds_q_filter.to_netcdf('/home/tropical2extratropic/data/q_1980_opt_tfilter_gpuMatrix.nc')
 
     # calculate vertical integration
     q_vi = mlevel_vint(da_anom_gpu,da_lp_gpu,model='erai')
