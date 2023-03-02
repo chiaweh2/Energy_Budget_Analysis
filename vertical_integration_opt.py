@@ -40,8 +40,8 @@ def get_A_B_erai(levelSize=60):
       9.5182150602e-001, 9.6764522791e-001, 9.7966271639e-001, 9.8827010393e-001, 9.9401944876e-001,
       9.9763011932e-001, 1.0000000000e+000 ]
     ## extract A and B 
-    A = np.array(pv[:levelSize+1])
-    B = np.array(pv[levelSize+1:])
+    A = np.array(pv[:levelSize+1],dtype='float32')
+    B = np.array(pv[levelSize+1:],dtype='float32')
 
 
     return A, B
@@ -95,7 +95,7 @@ def mlevel_vint(da_var,da_log_ps,model='erai'):
 
     
     # vertical integration from 0 to ps int(var/g*dp)
-    var_vint = np.sum(var*dp,axis=1, dtype='float64')/g
+    var_vint = np.sum(var*dp,axis=1, dtype='float32')/g
     return var_vint
 
 def lanczos_low_pass_weights(window, cutoff):
@@ -127,10 +127,10 @@ def lanczos_filter_4d(da_var_anom, window, cutoff):
     wt = lanczos_low_pass_weights(window, cutoff)
 
     var_anom_filtered = convolve1d(
-            da_var_anom.astype('float64').data,
+            da_var_anom.astype('float32').data,
             wt,
             axis=0,
-            output='float64')
+            output='float32')
 
     da_var_anom_filtered = da_var_anom.copy(data=var_anom_filtered)
     # da_var_anom_filtered = da_var_anom.copy()
@@ -163,9 +163,10 @@ if __name__ == '__main__':
     # read data
     t0 = time.time()
     # print('read data')
-    ds = xr.open_dataset('./data/q_ml_1980_rechunked.nc').isel(latitude=slice(0,40)).load()
-    da_lp = xr.open_dataset('./data/zlnsp_ml_1980.nc').lnsp.isel(latitude=slice(0,40)).load()
-    da_lp = da_lp.astype('float64')
+    ds = xr.open_dataset('./data/q_ml_1980_rechunked.nc').load()
+    da_lp = xr.open_dataset('./data/zlnsp_ml_1980.nc').lnsp.load()
+    da_lp = da_lp.astype('float32')
+    ds['q'] = ds.q.astype('float32')
     # ds = xr.open_dataset('./data/q_ml_1980.nc').isel(time=slice(0,500)).load()
     # da_lp = xr.open_dataset('./data/zlnsp_ml_1980.nc').lnsp.isel(time=slice(0,500)).load()
     t1 = time.time()
