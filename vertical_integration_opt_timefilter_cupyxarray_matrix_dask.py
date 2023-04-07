@@ -1,11 +1,15 @@
-
-#!/home/chsu/mambaforge/envs/py3_10/bin/python
-
+#!/home/6embdqs6/.conda/envs/vint/bin/python
+import time
+import cupy_xarray
+import cupy as cp
 import numpy as np
 import xarray as xr
-import time
-from scipy.ndimage import convolve1d
+from cupyx.scipy.ndimage import convolve1d
+import nvtx
+from dask.distributed import Client
+from dask_cuda import LocalCUDACluster
 
+@nvtx.annotate()
 def get_A_B_erai(levelSize=60):
     """
     This function return A and B array used to calculate the half level
@@ -42,12 +46,13 @@ def get_A_B_erai(levelSize=60):
       9.5182150602e-001, 9.6764522791e-001, 9.7966271639e-001, 9.8827010393e-001, 9.9401944876e-001,
       9.9763011932e-001, 1.0000000000e+000 ]
     ## extract A and B 
-    A = np.array(pv[:levelSize+1],dtype='float32')
-    B = np.array(pv[levelSize+1:],dtype='float32')
+    A = cp.array(pv[:levelSize+1])
+    B = cp.array(pv[levelSize+1:])
 
 
     return A, B
 
+@nvtx.annotate()
 def cal_dp(ps,model='erai'):
     """
     Calculate the n+1 dim dp matrix for vertical dp intergal.
@@ -70,36 +75,40 @@ def cal_dp(ps,model='erai'):
     broadcast_shape = tuple(broadcast_shape)
     dA = A[1:]-A[:-1]
     dB = B[1:]-B[:-1]
-    dA = np.broadcast_to(dA,(broadcast_shape))
-    dB = np.broadcast_to(dB,(broadcast_shape))
-    ps = np.broadcast_to(ps,(broadcast_shape_ps))
-    ps = np.moveaxis(ps, 0, -1)
-    dp=dA+dB*ps
+    dA = cp.broadcast_to(dA,(broadcast_shape))
+    dB = cp.broadcast_to(dB,(broadcast_shape))
+    ps = cp.broadcast_to(ps,(broadcast_shape_ps))
+    ps = cp.moveaxis(ps, 0, -1)
+    dp = dA+dB*ps
     return dp
 
-
+@nvtx.annotate()
 def mlevel_vint(da_var,da_log_ps,model='erai'):
-    var = da_var.data
-    ps = np.exp(da_log_ps.data)
+    var_gpu = da_var.data
+    ps_gpu = cp.exp(da_log_ps.data)
 
     # gravitional constant
-    g = np.int32(9.81)
+    g = cp.int32(9.81)
     # calculate dp matrix for vertical integration
-    dp = cal_dp(ps,model=model)
-    dp = np.moveaxis(dp, -1, 1)
-    da_dp = da_var.copy(data=dp)
-    # da_q_vint = q_vi
-    ds_dp = xr.Dataset()
-    ds_dp.attrs['comments'] = 'variable vertical integrated along model level'
-    ds_dp['dp'] = da_dp
-    ds_dp['dp'].attrs['long_name'] = 'vertical integrated q along model level'
-    ds_dp.to_netcdf('/home/tropical2extratropic/data/dp.nc')
+    dp = cal_dp(ps_gpu,model=model)
+    dp = cp.moveaxis(dp, -1, 1)
 
-    
+    # dp_cpu = cp.asnumpy(dp)
+    # da_dp = da_var.copy(data=dp_cpu)
+    # # da_q_vint = q_vi
+    # ds_dp = xr.Dataset()
+    # ds_dp.attrs['comments'] = 'variable vertical integrated along model level'
+    # ds_dp['dp'] = da_dp
+    # ds_dp['dp'].attrs['long_name'] = 'vertical integrated q along model level'
+    # ds_dp.to_netcdf('/home/tropical2extratropic/data/dp_gpu.nc')
+
     # vertical integration from 0 to ps int(var/g*dp)
-    var_vint = np.sum(var*dp,axis=1, dtype='float32')/g
+    var_vint = cp.sum(var_gpu*dp,axis=1, dtype='float64')/g
+
+
     return var_vint
 
+@nvtx.annotate()
 def lanczos_low_pass_weights(window, cutoff):
     """
     Calculate weights for a low pass Lanczos filter.
@@ -123,95 +132,85 @@ def lanczos_low_pass_weights(window, cutoff):
     w[n+1:-1] = firstfactor * sigma
     return w[1:-1]
 
-
-def lanczos_filter_4d(da_var_anom, window, cutoff):
+@nvtx.annotate()
+def lanczos_filter_matrix(da_var_anom, window, cutoff):
 
     wt = lanczos_low_pass_weights(window, cutoff)
+    wt = cp.asarray(wt)
 
-    var_anom_filtered = convolve1d(
-            da_var_anom.astype('float32').data,
+    
+
+        var_anom_filtered = convolve1d(
+            da_var_anom.astype('float64').data,
             wt,
             axis=0,
-            output='float32')
+            output='float64')
 
     da_var_anom_filtered = da_var_anom.copy(data=var_anom_filtered)
-    # da_var_anom_filtered = da_var_anom.copy()
 
-    # nlat=da_var_anom_filtered.latitude.size
-    # nlon=da_var_anom_filtered.longitude.size
-    # nlev=da_var_anom_filtered.level.size
-
-    # for llev in range(nlev):
-    #     for llon in range(nlon):
-    #         for llat in range(nlat):
-    #             # da_var_anom_filtered[:,llev,llat,llon] = np.convolve(
-    #             #     wt,
-    #             #     da_var_anom[:,llev,llat,llon].data,
-    #             #     mode='same'
-    #             #     )
-    #             da_var_anom_filtered[:,llev,llat,llon] = convolve1d(
-    #                 da_var_anom[:,llev,llat,llon].astype('float64').data,
-    #                 wt,
-    #                 output = 'float64',
-    #                 mode='reflect'
-    #                 )                
-    #             # note: no need to add "values"
-    #             ## note: change the [:,llev] depending on the dimension of the array
 
     return da_var_anom_filtered
 
 if __name__ == '__main__':
 
+    cluster = LocalCUDACluster()
+    client = Client(cluster)
+
     # read data
     t0 = time.time()
-    # print('read data')
-    ds = xr.open_dataset('./data/q_ml_1980_rechunked.nc').load()
-    da_lp = xr.open_dataset('./data/zlnsp_ml_1980.nc').lnsp.load()
-    da_lp = da_lp.astype('float32')
-    ds['q'] = ds.q.astype('float32')
-    # ds = xr.open_dataset('./data/q_ml_1980.nc').isel(time=slice(0,500)).load()
-    # da_lp = xr.open_dataset('./data/zlnsp_ml_1980.nc').lnsp.isel(time=slice(0,500)).load()
+    ds = xr.open_dataset('./data/q_ml_1980_rechunked.nc')
+    da_lp = xr.open_dataset('./data/zlnsp_ml_1980.nc').lnsp
+    da_lp = da_lp.astype('float64')
+
     t1 = time.time()
     total = t1-t0
     print("read data",total,"secs")
 
-    ##### calculate high frequency
+    # host to device
     t0 = time.time()
+    da_q_gpu = ds.q.map_blocks(cp.asarray)
+    da_lp_gpu = da_lp.map_blocks(cp.asarray)
+    # da_q_gpu = ds.q.cupy.as_cupy()
+    # da_lp_gpu = da_lp.cupy.as_cupy()
+
+    ##### calculate high frequency
     # calculate ano and low pass
     window = 96+96+1
-    cutoff = 1/(8*4)   # 6hourly daily data (4 times daily) for 8 days
-    da_anom = ds.q - ds.q.mean(dim='time')
-    # da_q_anom = ds.q.copy(data=da_anom.data)
+    cutoff = 1/(8*4)   # 6hourly data (4 times daily) for 8 days
+    da_anom_gpu = da_q_gpu - da_q_gpu.mean(dim='time')
+
+    # da_anom_cpu = da_anom_gpu.as_numpy()
+    # da_q_anom = ds.q.copy(data=da_anom_cpu.data)
     # ds_q_anom = xr.Dataset()
     # ds_q_anom.attrs['comments'] = 'variable time filtered along time dim'
     # ds_q_anom['q_anom'] = da_q_anom
     # ds_q_anom['q_anom'].attrs['long_name'] = 'variable time filtered along time dim'
-    # ds_q_anom.to_netcdf('/home/tropical2extratropic/data/q_1980_opt_anom.nc')
+    # ds_q_anom.to_netcdf('/home/tropical2extratropic/data/q_1980_opt_anom_gpu.nc')
 
-    da_anom_lowpass = lanczos_filter_4d(da_anom,window,cutoff)
+    da_anom_lowpass = lanczos_filter_matrix(da_anom_gpu,window,cutoff)
+
     #calculate high pass
-    da_anom = da_anom-da_anom_lowpass
-    # da_q_filter = ds.q.copy(data=da_anom.data)
+    da_anom_gpu = da_anom_gpu-da_anom_lowpass
+    del da_anom_lowpass
+    # da_anom_cpu = da_anom_gpu.as_numpy()
+    # da_q_filter = ds.q.copy(data=da_anom_cpu.data)
     # ds_q_filter = xr.Dataset()
     # ds_q_filter.attrs['comments'] = 'variable time filtered along time dim'
     # ds_q_filter['q_filter'] = da_q_filter
     # ds_q_filter['q_filter'].attrs['long_name'] = 'variable time filtered along time dim'
-
-    # ds_q_filter.to_netcdf('/home/tropical2extratropic/data/q_1980_opt_tfilter.nc')   
-
+    # ds_q_filter.to_netcdf('/home/tropical2extratropic/data/q_1980_opt_tfilter_gpuMatrix.nc')
 
     # calculate vertical integration
-    q_vi = mlevel_vint(da_anom,da_lp,model='erai')
+    q_vi = mlevel_vint(da_anom_gpu,da_lp_gpu,model='erai')
     t1 = time.time()
     total = t1-t0
     print("vertical integration",total,"secs")
 
-    # da_q_vint = ds.q.isel(level=0,drop=True).copy(data=q_vi)
+    q_vi_cpu = cp.asnumpy(q_vi)
+    # da_q_vint = ds.q.isel(level=0,drop=True).copy(data=q_vi_cpu)
     # # da_q_vint = q_vi
     # ds_q_vint = xr.Dataset()
     # ds_q_vint.attrs['comments'] = 'variable vertical integrated along model level'
     # ds_q_vint['q_vint'] = da_q_vint
     # ds_q_vint['q_vint'].attrs['long_name'] = 'vertical integrated q along model level'
-
-    # ds_q_vint.to_netcdf('/home/tropical2extratropic/data/q_vint_1980_opt_tfilter.nc')
-
+    # ds_q_vint.to_netcdf('/home/tropical2extratropic/data/q_vint_1980_opt_tfilter_gpuMatrix.nc')
